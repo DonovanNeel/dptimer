@@ -6,10 +6,16 @@ use std::{
         SystemTime,
         UNIX_EPOCH
     },
+    io::{
+        self,
+        Write,
+        BufRead,
+        BufReader,
+    },
 };
-use std::io::Write;
+use std::io::Seek;
 use clap::{Parser, Subcommand};
-
+use crate::time_converter::from_i32_to_string;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -73,18 +79,25 @@ fn main() {
                 .write(true)
                 .create(true)
                 .open(timer_file_name);
-            match file_result {
-                Ok(_) => {
+
+            let mut file = match file_result {
+                Ok(file) =>  {
                     println!("Timer initialized successfully!");
+                    file
                 }
                 Err(_) => {
                     println!("Unable initialize!");
+                    return;
                 }
-            }
+            };
+
+            file.write(b"t: 0\n").unwrap();
+
         }
         Commands::Start {from, in_units, get_from_save} => {
 
             let file_result = OpenOptions::new()
+                .append(true)
                 .write(true)
                 .open(timer_file_name);
 
@@ -100,20 +113,53 @@ fn main() {
                 .duration_since(UNIX_EPOCH)
                 .unwrap();
 
-            let writable_start_time = start_time.as_secs().to_string();
+            let writable_start_time = format!("s: {}\n", start_time.as_secs().to_string());
             file.write(writable_start_time.as_bytes()).unwrap();
-
-            println!("Start timer successfully! Start time: {}",
-                 time_converter::from_i32_to_string(
-                     writable_start_time
-                         .parse::<i32>()
-                         .unwrap()
-                 )
-            );
         }
         Commands::Pause {} => {}
         Commands::Resume {} => {}
         Commands::Read {} => {
+            let file_result = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(timer_file_name);
+
+            let file = match file_result {
+                Ok(file) => file,
+                Err(_) => {
+                    println!("Could not find timer!");
+                    return;
+                }
+            };
+
+            let mut reader = BufReader::new(&file);
+
+            //get current time
+            let current_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap();
+
+            //use current time and start time to find the time spent
+            let mut buffer = Vec::new();
+            reader.read_until(b's', &mut buffer).unwrap();
+            buffer.clear();
+            reader.read_until(b'\n', &mut buffer).unwrap();
+
+            let temp_start_time = String::from_utf8_lossy(&buffer);
+
+            let start_time_unclipped = temp_start_time
+                .split(' ')
+                .collect::<Vec<&str>>()[1];
+
+            let start_time = start_time_unclipped.trim_end().parse::<i32>().unwrap();
+
+            let time_spent =  current_time.as_secs() as i32 - start_time;
+
+            //update the total time spent (marked with "t: " in the text file)
+
+            //set the start time to the current time (marked with "s: " in the text file)
+
+
 
         }
         Commands::Add {amount} => {
