@@ -118,6 +118,7 @@ fn main() {
         }
         Commands::Pause {} => {}
         Commands::Resume {} => {}
+
         Commands::Read {} => {
             let file_result = OpenOptions::new()
                 .read(true)
