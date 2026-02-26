@@ -15,7 +15,7 @@ impl<'a> Selector<'a>{
         Selector{reader}
     }
 
-    pub fn select_time(&mut self, time_type: char) -> i32 {
+    pub fn select_time(&mut self, time_type: char) -> Option<i32> {
         let mut buffer = Vec::new();
 
         self.reader.rewind().unwrap();
@@ -23,6 +23,9 @@ impl<'a> Selector<'a>{
         self.reader.read_until(time_type as u8, &mut buffer).unwrap();
         buffer.clear();
         self.reader.read_until(b'\n', &mut buffer).unwrap();
+        if buffer.is_empty() {
+            return None;
+        }
 
         let temp_time = String::from_utf8_lossy(&buffer);
 
@@ -35,6 +38,6 @@ impl<'a> Selector<'a>{
             .parse::<i32>()
             .unwrap();
 
-        time
+        Some(time)
     }
 }

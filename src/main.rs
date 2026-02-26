@@ -2,7 +2,10 @@ mod time_converter;
 mod selector;
 
 use std::{
-    fs::OpenOptions,
+    fs::{
+        OpenOptions,
+        File
+    },
     time::{
         SystemTime,
         UNIX_EPOCH
@@ -13,6 +16,8 @@ use std::{
         Seek,
     },
 };
+use std::thread::current;
+use std::time::Duration;
 use clap::{Parser, Subcommand};
 use crate::time_converter::from_i32_to_string;
 use crate::selector::Selector;
@@ -36,8 +41,6 @@ enum Commands {
         from: i32,
         #[arg(short, long, default_value_t = 's')]
         in_units: char,
-        #[arg(short, long, default_value_t = false)]
-        get_from_save: bool,
     },
     /// Pauses the timer
     Pause {
@@ -72,6 +75,8 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
     let timer_file_name = "dptimer.txt";
+    let pause_value_false = 0;
+    let pause_value_true = 1;
 
     match &cli.command {
         Commands::Init {} => {
@@ -80,7 +85,7 @@ fn main() {
                 .create(true)
                 .open(timer_file_name);
 
-            let mut file = match file_result {
+            let _file = match file_result {
                 Ok(file) => {
                     println!("Timer initialized successfully!");
                     file
@@ -91,9 +96,10 @@ fn main() {
                 }
             };
         }
-        Commands::Start { from, in_units, get_from_save } => {
+        Commands::Start { from, in_units} => {
             let file_result = OpenOptions::new()
                 .append(true)
+                .read(true)
                 .write(true)
                 .open(timer_file_name);
 
@@ -104,6 +110,20 @@ fn main() {
                     return;
                 }
             };
+
+            let reader = BufReader::new(&file);
+            let mut time_selector = Selector::new(reader);
+
+            let check_empty = time_selector.select_time('t');
+
+            let is_empty: bool = match check_empty {
+                Some(value) => false,
+                None => true,
+            };
+
+            if !is_empty {
+                return;
+            }
 
             let mut from_value = *from;
 
@@ -136,11 +156,11 @@ fn main() {
 
             let writable_start_time = format!("s: {}\n", start_time.as_secs().to_string());
             file.write(writable_start_time.as_bytes()).unwrap();
-        }
-        Commands::Pause {} => {}
-        Commands::Resume {} => {}
 
-        Commands::Read {} => {
+            let writable_pause_state = format!("p: {}\n", pause_value_false);
+            file.write(writable_pause_state.as_bytes()).unwrap();
+        }
+        Commands::Pause {} => {
             let file_result = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -157,37 +177,164 @@ fn main() {
             let reader = BufReader::new(&file);
             let mut time_selector = Selector::new(reader);
 
-            let current_time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as i32;
+            let total_time;
 
-            let start_time = time_selector.select_time('s'); // s for start
-            let total_time = time_selector.select_time('t'); // t for total
+            if let Some(total_time_option) = time_selector.select_time('t') {
+                total_time = total_time_option;
+            }
+            else {
+                println!("Total time select not found!");
+                return;
+            }
 
-            println!("{} {}", start_time, total_time); //TODO: remove test code
-
-            let time_spent = total_time + current_time - start_time;
-
-            println!("Time spent: {}", from_i32_to_string(time_spent));
-
-            //update text file
             file.set_len(0).unwrap();
             file.rewind().unwrap();
 
-            let writable_time_spent = format!("t: {}\n", time_spent);
+            let writable_time_spent = format!("t: {}\n", total_time);
 
             file.write(writable_time_spent.as_bytes()).unwrap();
 
-            let new_start_time = SystemTime::now()
+            let writable_start_time = format!("s: {}\n", 0);
+            file.write(writable_start_time.as_bytes()).unwrap();
+
+            let writable_pause_state = format!("p: {}\n", 1);
+            file.write(writable_pause_state.as_bytes()).unwrap();
+        }
+        Commands::Resume {} => {
+            let file_result = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(timer_file_name);
+
+            let mut file = match file_result {
+                Ok(file) => file,
+                Err(_) => {
+                    println!("Could not find timer!");
+                    return;
+                }
+            };
+
+            let reader = BufReader::new(&file);
+            let mut time_selector = Selector::new(reader);
+
+            let is_paused = match time_selector.select_time('p') {
+                Some(p) => p == 1, //pause_value_true
+                None => false,
+            };
+
+            if !is_paused {
+                return;
+            }
+
+            let total_time;
+
+            if let Some(total_time_option) = time_selector.select_time('t') {
+                total_time = total_time_option;
+            }
+            else {
+                println!("Total time select not found!");
+                return;
+            }
+
+            file.set_len(0).unwrap();
+            file.rewind().unwrap();
+
+            let from_time = format!("t: {}\n", total_time);
+
+            file.write(from_time.as_bytes()).unwrap();
+
+            let start_time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap();
 
-            let writable_start_time = format!("s: {}\n", new_start_time.as_secs().to_string());
+            let writable_start_time = format!("s: {}\n", start_time.as_secs().to_string());
             file.write(writable_start_time.as_bytes()).unwrap();
+
+            let writable_pause_state = format!("p: {}\n", pause_value_false);
+            file.write(writable_pause_state.as_bytes()).unwrap();
+        }
+
+        Commands::Read {} => {
+            let file_result = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(timer_file_name);
+
+            let file = match file_result {
+                Ok(file) => file,
+                Err(_) => {
+                    println!("Could not find timer!");
+                    return;
+                }
+            };
+
+            let could_not_find_time_error_response = | | {
+                println!("Could not find time spent!");
+                -1
+            };
+
+            let time_spent = cycle_timer_and_get(file).unwrap_or_else(could_not_find_time_error_response);
+
+            if time_spent == -1 { return }
+
+            println!("Time spent: {}", from_i32_to_string(time_spent));
         }
         Commands::Add { amount } => {}
         Commands::Subtract { amount } => {}
         Commands::End {} => {}
     }
+}
+
+fn cycle_timer_and_get(mut file: File) -> Option<i32> {
+    let reader = BufReader::new(&file);
+    let mut time_selector = Selector::new(reader);
+
+    let is_paused = match time_selector.select_time('p') {
+        Some(p) => p == 1, //pause_value_true
+        None => false,
+    };
+
+    let time_spent;
+    let start_time = time_selector.select_time('s')?; // s for start
+    let total_time = time_selector.select_time('t')?; // t for total
+
+    let new_start_time;
+
+    if is_paused {
+        time_spent = total_time;
+        new_start_time = Duration::new(0, 0);
+    }
+    else {
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i32;
+
+        println!("c{} s{} t{}", current_time, start_time, total_time); //TODO: remove test code
+
+        let time_dif = current_time.checked_sub(start_time)?;
+        time_spent = total_time.checked_add(time_dif)?;
+
+        println!("Time spent: {}", from_i32_to_string(time_spent)); //TODO: remove this line
+
+        new_start_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+    }
+
+    //update text file
+    file.set_len(0).unwrap();
+    file.rewind().unwrap();
+
+    let writable_time_spent = format!("t: {}\n", time_spent);
+
+    file.write(writable_time_spent.as_bytes()).unwrap();
+
+    let writable_start_time = format!("s: {}\n", new_start_time.as_secs().to_string());
+    file.write(writable_start_time.as_bytes()).unwrap();
+
+    let writable_pause_state = format!("p: {}\n", is_paused as i32);
+    file.write(writable_pause_state.as_bytes()).unwrap();
+
+    Some(time_spent)
 }
