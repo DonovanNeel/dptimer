@@ -8,13 +8,11 @@ use std::{
         UNIX_EPOCH
     },
     io::{
-        self,
         Write,
-        BufRead,
         BufReader,
+        Seek,
     },
 };
-use std::io::{Seek, SeekFrom};
 use clap::{Parser, Subcommand};
 use crate::time_converter::from_i32_to_string;
 use crate::selector::Selector;
