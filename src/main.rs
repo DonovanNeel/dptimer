@@ -14,7 +14,7 @@ use std::{
         BufReader,
     },
 };
-use std::io::Seek;
+use std::io::{Seek, SeekFrom};
 use clap::{Parser, Subcommand};
 use crate::time_converter::from_i32_to_string;
 use crate::selector::Selector;
@@ -92,8 +92,6 @@ fn main() {
                     return;
                 }
             };
-
-            file.write(b"t: 0\n").unwrap();
         }
         Commands::Start { from, in_units, get_from_save } => {
             let file_result = OpenOptions::new()
@@ -108,6 +106,31 @@ fn main() {
                     return;
                 }
             };
+
+            let mut from_value = *from;
+
+            if *in_units == 'm' {
+                match from_value.checked_mul(60) {
+                    Some(value) => from_value = value,
+                    None => {
+                        println!("Value too large!\nInteger roled over.");
+                        return;
+                    }
+                }
+            }
+            if *in_units == 'h' {
+                match from_value.checked_mul(3600) {
+                    Some(value) => from_value = value,
+                    None => {
+                        println!("Value too large!\nInteger roled over.");
+                        return;
+                    }
+                }
+            }
+
+            let from_time = format!("t: {}\n", from_value);
+
+            file.write(from_time.as_bytes()).unwrap();
 
             let start_time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -125,7 +148,7 @@ fn main() {
                 .write(true)
                 .open(timer_file_name);
 
-            let file = match file_result {
+            let mut file = match file_result {
                 Ok(file) => file,
                 Err(_) => {
                     println!("Could not find timer!");
@@ -136,7 +159,6 @@ fn main() {
             let reader = BufReader::new(&file);
             let mut time_selector = Selector::new(reader);
 
-            //get current time, start time, and total time to calculate the time spent
             let current_time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -151,10 +173,20 @@ fn main() {
 
             println!("Time spent: {}", from_i32_to_string(time_spent));
 
-            //update the total time spent (marked with "t: " in the text file)
+            //update text file
+            file.set_len(0).unwrap();
+            file.rewind().unwrap();
 
-            //set the start time to the current time (marked with "s: " in the text file)
+            let writable_time_spent = format!("t: {}\n", time_spent);
 
+            file.write(writable_time_spent.as_bytes()).unwrap();
+
+            let new_start_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap();
+
+            let writable_start_time = format!("s: {}\n", new_start_time.as_secs().to_string());
+            file.write(writable_start_time.as_bytes()).unwrap();
         }
         Commands::Add { amount } => {}
         Commands::Subtract { amount } => {}
