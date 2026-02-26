@@ -1,4 +1,5 @@
 mod time_converter;
+mod selector;
 
 use std::{
     fs::OpenOptions,
@@ -16,6 +17,7 @@ use std::{
 use std::io::Seek;
 use clap::{Parser, Subcommand};
 use crate::time_converter::from_i32_to_string;
+use crate::selector::Selector;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -81,7 +83,7 @@ fn main() {
                 .open(timer_file_name);
 
             let mut file = match file_result {
-                Ok(file) =>  {
+                Ok(file) => {
                     println!("Timer initialized successfully!");
                     file
                 }
@@ -92,10 +94,8 @@ fn main() {
             };
 
             file.write(b"t: 0\n").unwrap();
-
         }
-        Commands::Start {from, in_units, get_from_save} => {
-
+        Commands::Start { from, in_units, get_from_save } => {
             let file_result = OpenOptions::new()
                 .append(true)
                 .write(true)
@@ -133,43 +133,31 @@ fn main() {
                 }
             };
 
-            let mut reader = BufReader::new(&file);
+            let reader = BufReader::new(&file);
+            let mut time_selector = Selector::new(reader);
 
-            //get current time
+            //get current time, start time, and total time to calculate the time spent
             let current_time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap();
+                .unwrap()
+                .as_secs() as i32;
 
-            //use current time and start time to find the time spent
-            let mut buffer = Vec::new();
-            reader.read_until(b's', &mut buffer).unwrap();
-            buffer.clear();
-            reader.read_until(b'\n', &mut buffer).unwrap();
+            let start_time = time_selector.select_time('s'); // s for start
+            let total_time = time_selector.select_time('t'); // t for total
 
-            let temp_start_time = String::from_utf8_lossy(&buffer);
+            println!("{} {}", start_time, total_time); //TODO: remove test code
 
-            let start_time_unclipped = temp_start_time
-                .split(' ')
-                .collect::<Vec<&str>>()[1];
+            let time_spent = total_time + current_time - start_time;
 
-            let start_time = start_time_unclipped.trim_end().parse::<i32>().unwrap();
-
-            let time_spent =  current_time.as_secs() as i32 - start_time;
+            println!("Time spent: {}", from_i32_to_string(time_spent));
 
             //update the total time spent (marked with "t: " in the text file)
 
             //set the start time to the current time (marked with "s: " in the text file)
 
-
-
         }
-        Commands::Add {amount} => {
-
-        }
-        Commands::Subtract {amount} => {
-
-        }
+        Commands::Add { amount } => {}
+        Commands::Subtract { amount } => {}
         Commands::End {} => {}
     }
-
 }
