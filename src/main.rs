@@ -4,12 +4,12 @@ mod command_handler;
 
 use clap::{Parser, Subcommand};
 use crate::command_handler::{
-    Handler, 
-    InitHandler, 
-    PauseHandler, 
-    ReadHandler, 
-    ResumeHandler, 
-    StartHandler, 
+    Handler,
+    InitHandler,
+    PauseHandler,
+    ReadHandler,
+    ResumeHandler,
+    StartHandler,
 };
 
 #[derive(Parser, Debug)]
@@ -70,7 +70,6 @@ fn main() {
         Commands::Resume {} => {
             ResumeHandler::new(timer_file_name).execute_command();
         }
-
         Commands::Read {} => {
             ReadHandler::new(timer_file_name).execute_command();
         }
