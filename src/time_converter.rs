@@ -1,5 +1,4 @@
 use std::io::{Error, ErrorKind};
-use std::num::ParseIntError;
 
 pub fn from_i32_to_string(total_seconds: i32) -> Result<String, Error> {
     let hours = total_seconds / 3600;
