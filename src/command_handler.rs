@@ -1,3 +1,4 @@
+use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Seek, Write, Error, ErrorKind};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -292,6 +293,27 @@ impl Handler for AddHandler{
 impl Handler for SubtractHandler {
     fn execute_command(self)  -> Result<(), Error> {
         modify_total_time(self.file_name, &self.amount, false)
+    }
+}
+
+impl Handler for EndHandler{
+    fn execute_command(self)  -> Result<(), Error> {
+        let mut input = String::new();
+
+        println!("Do you wish to end the timer? All time saved will be lost. (y/n)");
+        loop {
+            io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() == "y" {
+                return fs::remove_file(self.file_name);
+            }
+            else if input.trim().to_lowercase() == "n" {
+                break;
+            }
+            println!("input must be 'y' or 'n'");
+            input.clear();
+        }
+        println!("Cancelling timer end.");
+        Ok(())
     }
 }
 

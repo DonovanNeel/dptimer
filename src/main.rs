@@ -4,7 +4,7 @@ mod command_handler;
 
 use std::io::Error;
 use clap::{Parser, Subcommand};
-use crate::command_handler::{AddHandler, Handler, InitHandler, PauseHandler, ReadHandler, ResumeHandler, StartHandler, SubtractHandler};
+use crate::command_handler::{AddHandler, EndHandler, Handler, InitHandler, PauseHandler, ReadHandler, ResumeHandler, StartHandler, SubtractHandler};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -81,7 +81,10 @@ fn main() {
             let execute_result = SubtractHandler::new(timer_file_name, amount.clone()).execute_command();
             check_result(execute_result);
         }
-        Commands::End {} => {}
+        Commands::End {} => {
+            let execute_result = EndHandler::new(timer_file_name).execute_command();
+            check_result(execute_result);
+        }
     }
 }
 
