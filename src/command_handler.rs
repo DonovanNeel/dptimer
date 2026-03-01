@@ -317,7 +317,7 @@ impl Handler for EndHandler{
     }
 }
 
-fn get_file_handle(file_name: String, read: bool, write: bool, append: bool, create: bool) -> Result<File, std::io::Error> {
+fn get_file_handle(file_name: String, read: bool, write: bool, append: bool, create: bool) -> Result<File, Error> {
     let file_result = OpenOptions::new()
         .read(read)
         .write(write)
@@ -342,7 +342,7 @@ fn set_file_content(
     file: File,
     total: i32,
     start: i32,
-    pause: i32) -> Result<(), std::io::Error> {
+    pause: i32) -> Result<(), Error> {
 
     write_to_file_part(&file, 't', total)?;
     write_to_file_part(&file, 's', start)?;
@@ -351,14 +351,14 @@ fn set_file_content(
     Ok(())
 }
 
-fn write_to_file_part(mut file: &File, part: char, time: i32) -> Result<(), std::io::Error> {
+fn write_to_file_part(mut file: &File, part: char, time: i32) -> Result<(), Error> {
     let writable_time_spent = format!("{}: {}\n", part, time);
     file.write(writable_time_spent.as_bytes())?;
 
     Ok(())
 }
 
-fn get_total_and_check(mut time_selector: Selector) -> Result<i32, std::io::Error> {
+fn get_total_and_check(mut time_selector: Selector) -> Result<i32, Error> {
     let total_time;
 
     if let Some(total_time_option) = time_selector.select_time('t') {
