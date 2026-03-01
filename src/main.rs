@@ -2,15 +2,9 @@ mod time_converter;
 mod selector;
 mod command_handler;
 
+use std::io::Error;
 use clap::{Parser, Subcommand};
-use crate::command_handler::{
-    Handler,
-    InitHandler,
-    PauseHandler,
-    ReadHandler,
-    ResumeHandler,
-    StartHandler,
-};
+use crate::command_handler::{AddHandler, Handler, InitHandler, PauseHandler, ReadHandler, ResumeHandler, StartHandler, SubtractHandler};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -58,23 +52,44 @@ fn main() {
 
     match &cli.command {
         Commands::Init {} => {
-            InitHandler::new(timer_file_name).execute_command();
+            let execute_result = InitHandler::new(timer_file_name).execute_command();
+            check_result(execute_result);
         }
         Commands::Start { from, in_units} => {
 
-            StartHandler::new(timer_file_name, *from, *in_units).execute_command();
+            let execute_result = StartHandler::new(timer_file_name, *from, *in_units)
+                .execute_command();
+            check_result(execute_result);
         }
         Commands::Pause {} => {
-            PauseHandler::new(timer_file_name).execute_command();
+            let execute_result = PauseHandler::new(timer_file_name).execute_command();
+            check_result(execute_result);
         }
         Commands::Resume {} => {
-            ResumeHandler::new(timer_file_name).execute_command();
+            let execute_result = ResumeHandler::new(timer_file_name).execute_command();
+            check_result(execute_result);
         }
         Commands::Read {} => {
-            ReadHandler::new(timer_file_name).execute_command();
+            let execute_result = ReadHandler::new(timer_file_name).execute_command();
+            check_result(execute_result);
         }
-        Commands::Add { amount } => {}
-        Commands::Subtract { amount } => {}
+        Commands::Add { amount } => {
+            let execute_result = AddHandler::new(timer_file_name, amount.clone()).execute_command();
+            check_result(execute_result);
+        }
+        Commands::Subtract { amount } => {
+            let execute_result = SubtractHandler::new(timer_file_name, amount.clone()).execute_command();
+            check_result(execute_result);
+        }
         Commands::End {} => {}
+    }
+}
+
+fn check_result(result: Result<(), Error>) {
+    match result {
+        Ok(_) => { }
+        Err(error) => {
+            println!("Failed with error: {}", error);
+        }
     }
 }
